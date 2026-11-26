@@ -1,0 +1,51 @@
+PEMBAYARAN VIA PAYMENT GATEWAY DUITKU + INVOICE CETAK
+=====================================================
+
+FILE BARU / YANG BERUBAH
+- duitku_lib.php       : fungsi Duitku (buat invoice, cek status, tandai lunas)
+- duitku_callback.php  : endpoint notifikasi dari Duitku (publik, diverifikasi signature HMAC-SHA256)
+- invoice.php          : invoice A4 yang bisa dicetak / disimpan PDF (pelanggan & staf)
+- store.php            : checkout toko online + metode "Duitku", tombol bayar, cek status, cetak invoice
+- index.php            : Pengaturan > Transaksi & Member > panel Duitku; tombol "Cek status ke Duitku" di halaman bayar admin
+- config.php           : kunci pengaturan Duitku + metode 'duitku'
+Kolom baru di tbl_transaksi (duitku_reference, duitku_payment_url, duitku_kode_bayar) dibuat OTOMATIS saat
+halaman dibuka pertama kali. Backup database dulu sebelum update.
+
+LANGKAH AKTIVASI
+1. Daftar di https://duitku.com, buat Project (pilih sandbox untuk uji coba), catat Merchant Code dan API Key.
+2. Login admin > Pengaturan > Transaksi & Member > panel "Payment gateway Duitku":
+   - centang Aktifkan, pilih mode Sandbox, isi Merchant code dan API key.
+   - isi "URL publik aplikasi", mis. https://tokosaya.com/tokoku_native (tanpa garis miring di akhir).
+   - Simpan.
+3. Pastikan ekstensi PHP cURL aktif (php.ini: extension=curl) dan restart Apache.
+   Bila muncul error "SSL certificate", unduh cacert.pem dan atur curl.cainfo di php.ini.
+
+ALUR PELANGGAN
+Keranjang > pilih "Duitku" > isi email > "Buat pesanan" > diarahkan ke halaman bayar Duitku
+(QRIS, virtual account, e-wallet, kartu) > selesai bayar kembali ke toko > status lunas
+> tombol "Cetak invoice". Pesanan Duitku kedaluwarsa otomatis dalam 60 menit (stok dikembalikan).
+
+CALLBACK & LOCALHOST
+Duitku mengirim notifikasi ke <URL publik>/duitku_callback.php. Alamat ini harus bisa diakses dari internet.
+Di localhost (XAMPP) callback tidak akan sampai; sebagai gantinya:
+- saat pelanggan kembali dari Duitku, toko otomatis memeriksa status ke Duitku, dan
+- pelanggan/admin bisa menekan "Cek status".
+Untuk menguji callback di komputer sendiri, buka terowongan (mis. ngrok / cloudflared) lalu isi URL publiknya.
+
+KEAMANAN
+- Callback hanya diterima bila signature HMAC-SHA256 cocok dan nominal sama dengan total pesanan.
+- Status lunas juga bisa dipastikan lewat API transactionStatus (permintaan bertanda tangan dari server).
+- Parameter resultCode di URL kembali (redirect) TIDAK dipakai sebagai bukti bayar.
+- API key tersimpan di tabel tbl_pengaturan (teks biasa). Jangan bagikan backup database; gunakan HTTPS di produksi.
+- Pindah ke produksi: ganti mode ke Production dan isi Merchant code + API key production
+  (berbeda dari sandbox).
+
+CETAK
+- Invoice A4: invoice.php?id=<id transaksi> (tombol "Cetak invoice" di toko online, "Cetak Invoice A4" di admin).
+  Gunakan dialog cetak browser; pilih "Simpan sebagai PDF" bila perlu.
+- Struk thermal kasir tetap di struk.php (transaksi Duitku yang lunas juga bisa dicetak di sana).
+
+CATATAN
+- Jika pesanan sudah kedaluwarsa/dibatalkan tetapi pembayarannya masuk belakangan, sistem tetap menandainya
+  lunas dan memesan ulang stok sebisanya (stok tidak akan di bawah 0). Periksa stok bila hal ini terjadi.
+- Biaya admin / fee Duitku mengikuti kontrak merchant Anda dan tidak ditambahkan ke total pesanan.
